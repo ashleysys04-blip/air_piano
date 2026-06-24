@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+<style>
+  :root{
+    --bg:#0B0E1A; --panel:#12182B; --panel2:#1A2138;
+    --line:rgba(201,162,75,.16); --line-strong:rgba(201,162,75,.34);
+    --brass:#C9A24B; --brass-bright:#E8C766;
+    --parch:#ECE6D6; --muted:#838AA3;
+    --display:"Cormorant Garamond",Georgia,serif;
+    --ui:"Inter",system-ui,sans-serif;
+    --mono:"Space Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:
+      radial-gradient(1200px 600px at 70% -10%, rgba(201,162,75,.08), transparent 60%),
+      radial-gradient(900px 500px at 0% 110%, rgba(60,80,160,.10), transparent 55%),
+      var(--bg);
+    color:var(--parch); font-family:var(--ui);
+    min-height:100%; padding:28px clamp(16px,4vw,56px) 56px;
+    -webkit-font-smoothing:antialiased;
+  }
+  header{max-width:1240px; margin:0 auto 22px}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:.42em;
+    text-transform:uppercase; color:var(--brass); margin-bottom:6px}
+  h1{font-family:var(--display); font-weight:600; font-size:clamp(34px,5vw,58px);
+    line-height:.98; letter-spacing:.01em}
+  h1 em{font-style:italic; color:var(--brass-bright)}
+  .sub{color:var(--muted); font-size:14px; margin-top:10px; max-width:580px}
+
+  .layout{max-width:1240px; margin:0 auto; display:grid;
+    grid-template-columns:300px 1fr; gap:24px; align-items:start}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+
+  .program{background:var(--panel); border:1px solid var(--line);
+    border-radius:16px; padding:8px}
+  .program .ph{font-family:var(--mono); font-size:10px; letter-spacing:.3em;
+    text-transform:uppercase; color:var(--muted); padding:14px 14px 8px}
+  .composer{position:relative; width:100%; text-align:left; cursor:pointer;
+    background:transparent; border:0; color:var(--parch);
+    padding:13px 16px; border-radius:11px; display:block; transition:background .18s}
+  .composer:hover{background:var(--panel2)}
+  .composer.active{background:linear-gradient(180deg,rgba(201,162,75,.14),rgba(201,162,75,.05))}
+  .composer.active::before{content:""; position:absolute; left:0; top:13px; bottom:13px;
+    width:3px; border-radius:3px; background:var(--brass-bright)}
+  .composer .nm{font-family:var(--display); font-size:23px; font-weight:600; line-height:1}
+  .composer .yr{font-family:var(--mono); font-size:10px; color:var(--muted); margin-top:3px}
+  .composer .bl{font-size:12px; color:var(--muted); margin-top:6px; line-height:1.45}
+  .composer.active .nm{color:var(--brass-bright)}
+  @media(max-width:900px){
+    .program{display:flex; overflow-x:auto; gap:6px; padding:8px}
+    .program .ph{display:none}
+    .composer{min-width:210px}
+  }
+
+  .stage-wrap{display:flex; flex-direction:column; gap:16px}
+  .stage{position:relative; aspect-ratio:16/10; width:100%;
+    background:#05060c; border:1px solid var(--line-strong); border-radius:18px;
+    overflow:hidden; box-shadow:0 30px 80px -40px rgba(0,0,0,.9)}
+  canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+  .stage .veil{position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:18px; text-align:center; padding:24px;
+    background:radial-gradient(600px 400px at 50% 40%, rgba(201,162,75,.06), transparent 70%)}
+  .veil p{color:var(--muted); font-size:13.5px; max-width:400px; line-height:1.55}
+  .start{font-family:var(--display); font-size:22px; font-weight:600; letter-spacing:.02em;
+    color:#0B0E1A; background:var(--brass-bright); border:0; cursor:pointer;
+    padding:14px 34px; border-radius:999px; transition:transform .15s, box-shadow .2s;
+    box-shadow:0 10px 30px -8px rgba(201,162,75,.6)}
+  .start:hover{transform:translateY(-1px); box-shadow:0 16px 40px -10px rgba(201,162,75,.7)}
+  .start:disabled{opacity:.5; cursor:default; transform:none; box-shadow:none}
+
+  .note-big{position:absolute; top:18px; left:22px; font-family:var(--display);
+    font-size:64px; font-weight:600; color:var(--brass-bright); line-height:1;
+    text-shadow:0 4px 24px rgba(201,162,75,.4); pointer-events:none; opacity:0; transition:opacity .12s}
+  .note-big small{font-family:var(--mono); font-size:12px; color:var(--muted);
+    display:block; letter-spacing:.2em; margin-top:4px; text-shadow:none}
+  .nowplaying{position:absolute; top:20px; right:22px; text-align:right; pointer-events:none}
+  .nowplaying .c{font-family:var(--display); font-size:26px; color:var(--parch); line-height:1}
+  .nowplaying .s{font-family:var(--mono); font-size:10px; color:var(--brass);
+    letter-spacing:.24em; text-transform:uppercase; margin-top:4px}
+  .rec-dot{position:absolute; bottom:18px; left:22px; display:none; align-items:center;
+    gap:8px; font-family:var(--mono); font-size:11px; letter-spacing:.18em; color:#E76A6A}
+  .rec-dot b{width:9px; height:9px; border-radius:50%; background:#E76A6A;
+    animation:blink 1s steps(2,end) infinite}
+  @keyframes blink{50%{opacity:.2}}
+
+  .transport{display:flex; flex-wrap:wrap; gap:16px 22px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 20px}
+  .ctl{display:flex; flex-direction:column; gap:7px; min-width:140px; flex:1}
+  .ctl label{font-family:var(--mono); font-size:10px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--muted); display:flex; justify-content:space-between}
+  .ctl label b{color:var(--brass); font-weight:400}
+  input[type=range]{-webkit-appearance:none; appearance:none; height:3px;
+    background:var(--line-strong); border-radius:3px; outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; width:15px; height:15px;
+    border-radius:50%; background:var(--brass-bright); cursor:pointer; border:2px solid var(--bg)}
+  .rec-btn{font-family:var(--ui); font-weight:600; font-size:13px; letter-spacing:.02em;
+    color:var(--parch); background:var(--panel2); border:1px solid var(--line-strong);
+    border-radius:999px; padding:11px 20px; cursor:pointer; transition:.18s; white-space:nowrap}
+  .rec-btn:hover{border-color:var(--brass)}
+  .rec-btn.on{background:#E76A6A; border-color:#E76A6A; color:#fff}
+  .rec-btn:disabled{opacity:.4; cursor:default}
+  #downloads{display:flex; flex-direction:column; gap:6px; margin-top:14px}
+  #downloads a{font-family:var(--mono); font-size:12px; color:var(--brass-bright);
+    text-decoration:none; padding:9px 14px; border:1px solid var(--line); border-radius:9px;
+    display:flex; justify-content:space-between; transition:.15s}
+  #downloads a:hover{border-color:var(--brass); background:var(--panel2)}
+  .hint{max-width:1240px; margin:18px auto 0; color:var(--muted); font-size:12.5px; line-height:1.6}
+  .hint code{font-family:var(--mono); color:var(--brass-bright); font-size:11.5px}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">gesture-controlled piano</div>
+  <h1>AIR</h1>
+  <p class="sub">손을 위아래로 움직여 음을 고르고, 엄지와 검지를 모아(핀치) 연주하세요.
+    작곡가를 고르면 그 어법의 반주가 따라오고, 멜로디 음계도 함께 바뀝니다.</p>
+</header>
+
+<div class="layout">
+  <nav class="program" id="program"><div class="ph">작곡가 선택</div></nav>
+
+  <div class="stage-wrap">
+    <div class="stage" id="stage">
+      <canvas id="cv"></canvas>
+      <div class="note-big" id="noteBig">—<small id="noteSub">PITCH</small></div>
+      <div class="nowplaying"><div class="c" id="npName">Bach</div><div class="s" id="npStyle">baroque</div></div>
+      <div class="rec-dot" id="recDot"><b></b> REC</div>
+      <div class="veil" id="veil">
+        <button class="start" id="startBtn">연주 시작</button>
+        <p>시작을 누르면 피아노 음원을 불러오고 카메라/소리가 켜집니다. 카메라 권한은 <b>허용</b>을 눌러주세요.</p>
+      </div>
+    </div>
+
+    <div class="transport">
+      <div class="ctl">
+        <label>핀치 감도 <b id="sensV">0.45</b></label>
+        <input type="range" id="sens" min="0.30" max="0.70" step="0.01" value="0.45">
+      </div>
+      <div class="ctl">
+        <label>전체 볼륨 <b id="volV">90%</b></label>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.9">
+      </div>
+      <div class="ctl">
+        <label>빠르기 <b id="bpmV">84</b></label>
+        <input type="range" id="bpm" min="40" max="160" step="1" value="84">
+      </div>
+      <button class="rec-btn" id="recBtn" disabled>● 녹음</button>
+    </div>
+    <div id="downloads"></div>
+  </div>
+</div>
+
+<p class="hint">팁 — 카메라가 안 켜지면 같은 폴더에서 <code>python3 -m http.server</code> 실행 후
+  <code>http://localhost:8000/air-classical.html</code> 로 여세요. 손을 <b>위로</b> 들수록 높은 음,
+  <b>핀치</b>를 풀면 음이 멈춥니다. 크롬 권장.</p>
+
+<script type="module">
+import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+
+/* ---- midi helpers ---- */
+const NAMES=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const m2n = m => NAMES[((m%12)+12)%12] + (Math.floor(m/12)-1); // 60 -> C4
+let piano; const play=(m,d,t,v)=>{ try{ piano.triggerAttackRelease(m2n(m),d,t,v); }catch(e){} };
+
+/* ----------------------------------------------------------------
+   COMPOSER ENGINES
+   Each = bpm, reverb (pedal), melody pitch-collection (hand snaps to it),
+   prog (hand-voiced harmony w/ smooth voice-leading), and an idiomatic
+   step() that renders that harmony in the composer's own texture.
+   step(s) runs at 16th-note resolution; s = sixteenth index in the phrase.
+-----------------------------------------------------------------*/
+const STYLES = {
+  bach:{
+    name:"Bach", years:"1685–1750", era:"baroque",
+    blurb:"독립된 성부가 얽히는 2~3성 대위, 쉼 없는 바로크 모터리듬. (e단조, 5도 하행 시퀀스)",
+    bpm:84, reverb:0.16, bars:8,
+    melody:[52,54,55,57,59,60,63,64,66,67,69,71,72,75,76], // E harmonic minor
+    prog:[[40,47,52,55],[45,52,57,60],[38,50,54,57],[43,50,55,59],
+          [36,48,52,55],[42,48,54,57],[47,51,54,57],[40,47,52,55]],
+    step(s){ const ch=this.prog[(s>>4)%this.bars], pos=s&15;
+      if(pos%2===0){ const seq=[0,1,0,2]; play(ch[seq[(pos/2)%4]%ch.length],"8n",undefined,0.5); }
+      else{ const up=[ch.length-1,ch.length-2]; play(ch[up[((pos-1)/2)%2]],"8n",undefined,0.4); } }
+  },
+  mozart:{
+    name:"Mozart", years:"1756–1791", era:"classical",
+    blurb:"또렷한 8마디 악구, 알베르티 베이스와 계단식 셈여림, 부속화음(V/ii). (C장조)",
+    bpm:120, reverb:0.13, bars:8,
+    melody:[60,62,64,65,67,69,71,72,74,76,77,79,81,83,84], // C major
+    prog:[[48,52,55],[45,49,52,55],[50,53,57],[43,47,50,53],
+          [48,52,55,60],[41,48,53,57],[43,47,50,53],[48,52,55,60]],
+    step(s){ const bar=(s>>4)%this.bars, ch=this.prog[bar], pos=s&15;
+      const lh=[ch[0],ch[1],ch[2]], pat=[0,2,1,2], dyn=bar<4?1:0.7;
+      play(lh[pat[pos%4]],"16n",undefined,0.32*dyn);
+      if(pos===0 && bar%2===0 && ch.length>3) play(ch[3],"4n",undefined,0.3); }
+  },
+  chopin:{
+    name:"Chopin", years:"1810–1849", era:"romantic",
+    blurb:"두 옥타브를 굴러가는 녹턴식 아르페지오, 9화음의 색채와 살짝 흔들리는 루바토. (E♭장조)",
+    bpm:60, reverb:0.42, bars:8,
+    melody:[63,65,67,68,70,72,74,75,77,79,80,82,84,86,87], // Eb major
+    prog:[[39,46,51,55,58,63],[36,48,51,55,60,63],[41,48,53,56,60,63],[34,46,50,53,56,62],
+          [39,46,51,55,58,63],[44,48,51,56,60,63],[34,46,50,53,56,62],[39,46,51,55,58,63]],
+    step(s){ const arp=this.prog[(s>>4)%this.bars], pos=s&15; if(pos%2) return;
+      const e=pos/2, seq=[0,1,2,3,4,5,4,3], swell=0.30+0.18*Math.sin(Math.PI*e/7);
+      play(arp[seq[e]%arp.length],"4n",Tone.now()+(Math.random()-0.5)*0.012,swell); }
+  },
+  scriabin:{
+    name:"Scriabin", years:"1872–1915", era:"symbolist",
+    blurb:"신비화음(C·F♯·B♭·E·A·D)과 온음음계, 떨리는 트레몰로의 황홀경 — 기능화성 너머의 부유.",
+    bpm:58, reverb:0.55, bars:8,
+    melody:[60,62,64,66,68,70,72,74,76,78,80,82,84], // whole-tone on C
+    prog:[[48,54,58,64,69,74],[50,56,60,66,71,76],[54,60,64,70,75,80],[52,58,62,68,73,78],
+          [48,54,58,64,69,74],[50,56,60,66,71,76],[54,60,64,70,75,80],[52,58,62,68,73,78]],
+    step(s){ const v=this.prog[(s>>4)%this.bars], pos=s&15, bar=(s>>4)%this.bars;
+      if(pos===0){ play(v[0],"1n",undefined,0.16); play(v[1],"1n",Tone.now()+0.02,0.13); }
+      const trem = pos%2===0 ? v[3] : v[4];
+      const swell=0.05+0.07*Math.sin(Math.PI*((bar*16+pos)/(this.bars*16)));
+      play(trem,"16n",Tone.now()+(Math.random()-0.5)*0.01,Math.max(0.03,swell));
+      if(pos===8) play(v[5],"2n",undefined,0.12); }
+  },
+  rachmaninoff:{
+    name:"Rachmaninoff", years:"1873–1943", era:"late-romantic",
+    blurb:"광활한 아르페지오와 종소리 옥타브, 나폴리 6화음과 후기낭만의 묵직한 밀도. (c♯단조)",
+    bpm:64, reverb:0.45, bars:8,
+    melody:[61,63,64,66,68,69,72,73,75,76,78,80,81,84,85], // C# harmonic minor
+    prog:[[37,44,49,52,56,61,64,68],[33,40,45,49,52,57,61,64],[30,42,45,49,54,57,61,66],
+          [38,45,50,54,57,62,66,69],[32,44,48,51,56,60,63],[37,44,49,52,56,61,64,68],
+          [30,42,45,49,54,57,61,66],[32,44,48,51,56,60,63]],
+    step(s){ const arp=this.prog[(s>>4)%this.bars], pos=s&15, bar=(s>>4)%this.bars, n=arp.length;
+      const idx = pos<8 ? Math.min(n-1,pos) : Math.max(0,n-1-(pos-8));
+      const phrase=0.40+0.45*Math.sin(Math.PI*bar/(this.bars-1));
+      play(arp[idx],"8n",Tone.now()+(Math.random()-0.5)*0.01,Math.min(0.85,phrase*0.7));
+      if(pos===0){ play(arp[0],"2n",undefined,Math.min(0.9,phrase));
+        play(arp[0]+12,"2n",Tone.now()+0.01,phrase*0.6); }
+      if(pos===0||pos===8){ play(arp[Math.min(4,n-1)],"2n",undefined,phrase*0.4);
+        play(arp[Math.min(6,n-1)],"2n",undefined,phrase*0.35); } }
+  }
+};
+let cur="bach";
+
+/* ---- audio graph (single shared grand piano) ---- */
+let master, reverb, recorder, loop, audioReady=false;
+async function buildAudio(){
+  master = new Tone.Gain(0.9).toDestination();
+  reverb = new Tone.Reverb({decay:4.5, wet:STYLES[cur].reverb}); await reverb.generate();
+  reverb.connect(master);
+  piano = new Tone.Sampler({
+    urls:{A0:"A0.mp3",C1:"C1.mp3","D#1":"Ds1.mp3","F#1":"Fs1.mp3",A1:"A1.mp3",
+      C2:"C2.mp3","D#2":"Ds2.mp3","F#2":"Fs2.mp3",A2:"A2.mp3",C3:"C3.mp3",
+      "D#3":"Ds3.mp3","F#3":"Fs3.mp3",A3:"A3.mp3",C4:"C4.mp3","D#4":"Ds4.mp3",
+      "F#4":"Fs4.mp3",A4:"A4.mp3",C5:"C5.mp3","D#5":"Ds5.mp3","F#5":"Fs5.mp3",
+      A5:"A5.mp3",C6:"C6.mp3","D#6":"Ds6.mp3","F#6":"Fs6.mp3",A6:"A6.mp3",
+      C7:"C7.mp3","D#7":"Ds7.mp3","F#7":"Fs7.mp3",A7:"A7.mp3",C8:"C8.mp3"},
+    baseUrl:"https://tonejs.github.io/audio/salamander/", release:1.4
+  }).connect(reverb);
+  recorder = new Tone.Recorder(); master.connect(recorder);
+  await Tone.loaded();
+  loop = new Tone.Loop(()=>{ const S=STYLES[cur]; S.step(loop._s % (16*S.bars)); loop._s++; }, "16n");
+  loop._s=0;
+  audioReady=true;
+}
+
+/* ---- hand tracking ---- */
+let handLandmarker, video, lastTime=-1;
+async function buildHands(){
+  const vision = await FilesetResolver.forVisionTasks(
+    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+  handLandmarker = await HandLandmarker.createFromOptions(vision,{
+    baseOptions:{ modelAssetPath:
+      "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+      delegate:"GPU" }, runningMode:"VIDEO", numHands:1 });
+}
+async function startCamera(){
+  const stream = await navigator.mediaDevices.getUserMedia({video:{width:1280,height:720}});
+  video=document.createElement("video"); video.srcObject=stream;
+  video.playsInline=true; video.muted=true; await video.play();
+}
+const CONN=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],
+  [11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+
+/* ---- render + play loop ---- */
+const cv=document.getElementById("cv"), ctx=cv.getContext("2d");
+const noteBig=document.getElementById("noteBig"), noteSub=document.getElementById("noteSub");
+let W=1280,H=800,notes=[],pinching=false,heldNote=null,sens=0.45,pendN=null,pendC=0;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+function render(){
+  requestAnimationFrame(render); if(!video) return;
+  cv.width=W; cv.height=H;
+  ctx.save(); ctx.scale(-1,1); ctx.drawImage(video,-W,0,W,H); ctx.restore();
+  ctx.fillStyle="rgba(8,10,22,.42)"; ctx.fillRect(0,0,W,H);
+
+  const now=performance.now(); let res=null;
+  if(handLandmarker && now!==lastTime){ res=handLandmarker.detectForVideo(video,now); lastTime=now; }
+
+  if(res && res.landmarks && res.landmarks.length){
+    const lm=res.landmarks[0], mx=p=>W-p.x*W, my=p=>p.y*H;
+    ctx.lineWidth=2; ctx.strokeStyle="rgba(201,162,75,.55)";
+    CONN.forEach(([i,j])=>{ ctx.beginPath(); ctx.moveTo(mx(lm[i]),my(lm[i])); ctx.lineTo(mx(lm[j]),my(lm[j])); ctx.stroke(); });
+    lm.forEach((p,i)=>{ ctx.beginPath(); ctx.fillStyle=(i===4||i===8)?"#E8C766":"rgba(236,230,214,.7)"; ctx.arc(mx(p),my(p),(i===4||i===8)?6:3,0,7); ctx.fill(); });
+
+    const handSize=dist(lm[0],lm[9])||0.001, ratio=dist(lm[4],lm[8])/handSize, isPinch=ratio<sens;
+    const S=STYLES[cur], y=Math.max(0,Math.min(1,lm[8].y));
+    const target=S.melody[Math.round((1-y)*(S.melody.length-1))];
+    const cx=(mx(lm[4])+mx(lm[8]))/2, cy=(my(lm[4])+my(lm[8]))/2;
+    ctx.beginPath(); ctx.lineWidth=isPinch?3:1.5; ctx.strokeStyle=isPinch?"#E8C766":"rgba(201,162,75,.35)";
+    ctx.arc(cx,cy,isPinch?14:Math.min(60,dist(lm[4],lm[8])*W*0.5),0,7); ctx.stroke();
+
+    if(audioReady){
+      if(isPinch){
+        if(target!==heldNote){
+          if(target===pendN) pendC++; else { pendN=target; pendC=0; }
+          if(pendC>=2 || heldNote===null){
+            if(heldNote) piano.triggerRelease(m2n(heldNote));
+            piano.triggerAttack(m2n(target),undefined,0.72);
+            heldNote=target; pendC=0; notes.push({x:cx,y:cy,life:1,note:m2n(target)});
+          }
+        }
+      } else if(heldNote!==null){ piano.triggerRelease(m2n(heldNote)); heldNote=null; }
+      pinching=isPinch;
+    }
+    noteBig.style.opacity=isPinch?1:.35;
+    noteBig.firstChild.textContent=m2n(target).replace(/-?\d/,"");
+    noteSub.textContent=isPinch?"PLAYING":"AIM";
+  } else {
+    if(audioReady && heldNote!==null){ piano.triggerRelease(m2n(heldNote)); heldNote=null; pinching=false; }
+    noteBig.style.opacity=0;
+  }
+
+  for(let i=notes.length-1;i>=0;i--){ const n=notes[i]; n.y-=1.4; n.life-=0.011;
+    if(n.life<=0){ notes.splice(i,1); continue; }
+    ctx.save(); ctx.globalAlpha=Math.max(0,n.life); ctx.shadowColor="#E8C766"; ctx.shadowBlur=18;
+    ctx.fillStyle="#E8C766"; ctx.beginPath(); ctx.ellipse(n.x,n.y,8,6,-0.4,0,7); ctx.fill();
+    ctx.shadowBlur=0; ctx.fillStyle="rgba(236,230,214,.9)"; ctx.font="600 13px 'Space Mono',monospace";
+    ctx.fillText(n.note,n.x+12,n.y+4); ctx.restore(); }
+}
+
+/* ---- UI ---- */
+const program=document.getElementById("program");
+const npName=document.getElementById("npName"), npStyle=document.getElementById("npStyle");
+function selectComposer(key){
+  cur=key;
+  [...program.querySelectorAll(".composer")].forEach(b=>b.classList.toggle("active",b.dataset.k===key));
+  npName.textContent=STYLES[key].name; npStyle.textContent=STYLES[key].era;
+  if(audioReady){ Tone.Transport.bpm.rampTo(STYLES[key].bpm,0.3); reverb.wet.rampTo(STYLES[key].reverb,0.4);
+    if(loop) loop._s=0;
+    document.getElementById("bpm").value=STYLES[key].bpm; document.getElementById("bpmV").textContent=STYLES[key].bpm; }
+}
+Object.entries(STYLES).forEach(([k,s])=>{ const b=document.createElement("button");
+  b.className="composer"; b.dataset.k=k;
+  b.innerHTML=`<div class="nm">${s.name}</div><div class="yr">${s.years} · ${s.era}</div><div class="bl">${s.blurb}</div>`;
+  b.onclick=()=>selectComposer(k); program.appendChild(b); });
+selectComposer("bach");
+
+document.getElementById("sens").oninput=e=>{ sens=+e.target.value; document.getElementById("sensV").textContent=(+e.target.value).toFixed(2); };
+document.getElementById("vol").oninput=e=>{ document.getElementById("volV").textContent=Math.round(e.target.value*100)+"%"; if(master) master.gain.rampTo(+e.target.value,0.1); };
+document.getElementById("bpm").oninput=e=>{ document.getElementById("bpmV").textContent=e.target.value; if(audioReady) Tone.Transport.bpm.rampTo(+e.target.value,0.2); };
+
+const recBtn=document.getElementById("recBtn"), recDot=document.getElementById("recDot");
+const downloads=document.getElementById("downloads"); let recording=false, recCount=0;
+recBtn.onclick=async()=>{ if(!audioReady) return;
+  if(!recording){ recorder.start(); recording=true; recBtn.classList.add("on"); recBtn.textContent="■ 정지"; recDot.style.display="flex"; }
+  else{ const blob=await recorder.stop(); recording=false; recBtn.classList.remove("on"); recBtn.textContent="● 녹음"; recDot.style.display="none";
+    const url=URL.createObjectURL(blob); recCount++;
+    const a=document.createElement("a"); a.href=url; a.download=`${cur}-take${recCount}.webm`;
+    a.innerHTML=`<span>♪ ${STYLES[cur].name} · Take ${recCount}</span><span>다운로드</span>`; downloads.prepend(a); }
+};
+
+const startBtn=document.getElementById("startBtn"), veil=document.getElementById("veil");
+startBtn.onclick=async()=>{ startBtn.disabled=true; startBtn.textContent="피아노 음원 불러오는 중…";
+  try{ await Tone.start(); await buildAudio();
+    startBtn.textContent="카메라 켜는 중…"; await startCamera(); await buildHands();
+    Tone.Transport.bpm.value=STYLES[cur].bpm; loop.start(0); Tone.Transport.start();
+    recBtn.disabled=false; veil.style.display="none"; render();
+  }catch(err){ startBtn.disabled=false; startBtn.textContent="다시 시도";
+    veil.querySelector("p").innerHTML="시작하지 못했어요: <b>"+err.message+"</b><br>크롬에서 카메라 권한을 허용했는지, 인터넷이 연결됐는지 확인해주세요."; }
+};
+</script>
+</body>
+</html>
